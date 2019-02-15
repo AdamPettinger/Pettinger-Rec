@@ -72,9 +72,9 @@ def get_effective_card(cards, advantage):
         else:
             value_1 = cards[1].value
         if value_0 <= value_1:
-            return ComboCard(cards[0].value, cards[0].type, cards[0].condition)
+            return ComboCard(cards[0].value, cards[0].type, str(cards[0].condition))
         else:
-            return ComboCard(cards[1].value, cards[1].type, cards[1].condition)
+            return ComboCard(cards[1].value, cards[1].type, str(cards[1].condition))
     elif(advantage == 1):
         # Advantage without rolling cards, take the best one
         # If either are Bless or Critical, we take it
@@ -91,9 +91,9 @@ def get_effective_card(cards, advantage):
         else:
             value_1 = cards[1].value
         if value_0 >= value_1:
-            return ComboCard(cards[0].value, cards[0].type, cards[0].condition)
+            return ComboCard(cards[0].value, cards[0].type, str(cards[0].condition))
         else:
-            return ComboCard(cards[1].value, cards[1].type, cards[1].condition)
+            return ComboCard(cards[1].value, cards[1].type, str(cards[1].condition))
 
 def play_until_shuffle(deck, attack_num_dist, advantage_dist):
     reshuffle_triggered = False

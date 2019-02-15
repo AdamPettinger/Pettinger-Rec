@@ -41,17 +41,39 @@ class ComboCard:
         self.conditions = conditions
         self.remove_duplicate_conditions()
 
+    def __init__(self, attack_card):
+        self.value = attack_card.value
+        self.type = attack_card.type
+        self.conditions[0] = attack_card.condition
+
     def remove_duplicate_conditions(self):
         list_of_allowed_duplicates = ['Push', 'Pull', 'Pierce',
                                       'Target', 'Curse', 'Bless']
 
-        count_dict = Counter(self.conditions)
-        print(count_dict)
-        self.conditions = list(set(self.conditions))
-        for cond in count_dict:
-            if cond in list_of_allowed_duplicates:
-                for i in range(count_dict[cond] - 1):
-                    self.conditions.append(cond)
+        unique_conditions = list(set(self.conditions))
+        new_conditions = unique_conditions
+
+        for c in unique_conditions:
+            if c in list_of_allowed_duplicates:
+                num_to_add = self.conditions.count(c) - 1
+                for i in range(num_to_add):
+                    new_conditions.append(c)
+
+        for i in self.conditions:
+            print(i)
+
+        self.conditions = new_conditions
+
+        for i in self.conditions:
+            print(i)
+##
+##        count_dict = Counter(self.conditions)
+##        print(count_dict)
+##        self.conditions = list(set(self.conditions))
+##        for cond in count_dict:
+##            if cond in list_of_allowed_duplicates:
+##                for i in range(count_dict[cond] - 1):
+##                    self.conditions.append(cond)
 
     def __str__(self):
         if (self.type == "Miss" or self.type == "Critical" or
