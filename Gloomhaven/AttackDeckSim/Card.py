@@ -1,5 +1,3 @@
-from collections import Counter 
-
 class AttackCard:
     # number = integer, condition = string
     # critical = "Miss" || "Critical", rolling = boolean
@@ -35,23 +33,25 @@ class AttackCard:
         return (self.type == "Critical" or self.type == "Miss")
 
 class ComboCard:
-    def __init__(self, number, card_type, conditions):
-        self.value = number
-        self.type = card_type
-        self.conditions = conditions
-        self.remove_duplicate_conditions()
+    def __init__(self, single_card, attack_card, number, card_type, conditions):
+        if single_card:
+            self.value = attack_card.value
+            self.type = attack_card.type
+            self.conditions = [""]
+            self.conditions[0] = attack_card.condition
 
-    def __init__(self, attack_card):
-        self.value = attack_card.value
-        self.type = attack_card.type
-        self.conditions[0] = attack_card.condition
+        else:
+            self.value = number
+            self.type = card_type
+            self.conditions = conditions
+            self.remove_duplicate_conditions()
 
     def remove_duplicate_conditions(self):
         list_of_allowed_duplicates = ['Push', 'Pull', 'Pierce',
                                       'Target', 'Curse', 'Bless']
 
         unique_conditions = list(set(self.conditions))
-        new_conditions = unique_conditions
+        new_conditions = list(set(self.conditions))
 
         for c in unique_conditions:
             if c in list_of_allowed_duplicates:
@@ -59,45 +59,48 @@ class ComboCard:
                 for i in range(num_to_add):
                     new_conditions.append(c)
 
-        for i in self.conditions:
-            print(i)
-
         self.conditions = new_conditions
-
-        for i in self.conditions:
-            print(i)
-##
-##        count_dict = Counter(self.conditions)
-##        print(count_dict)
-##        self.conditions = list(set(self.conditions))
-##        for cond in count_dict:
-##            if cond in list_of_allowed_duplicates:
-##                for i in range(count_dict[cond] - 1):
-##                    self.conditions.append(cond)
 
     def __str__(self):
         if (self.type == "Miss" or self.type == "Critical" or
-            self.type == "Curse" or self.type == "Bless"):
+            self.type == "Curse" or self.type == "Bless" or
+            self.type == "Advantaged Miss" or self.type == "Super Critical" or
+            self.type == "Disadvantaged Critical"):
             pre_string = str(self.value) + ", " + self.type
         else:
             pre_string = str(self.value)
 
-        return (pre_string + " " + str(self.conditions))
-                
-            
-##        if (self.type == "Miss" or self.type == "Critical" or
-##            self.type == "Curse" or self.type == "Bless"):
-##            return self.type
-##
-##        if len(self.conditions) == 0:
-##            return str(self.value)
-##        
-##        cond_str = " with "
-##        for i in self.conditions:
-##            cond_str += i + " and "
-##
-##        if cond_str.endswith(' and '):
-##            cond_str = cond_str[:-5]
-##
-##        return (str(self.value) + cond_str)
-##            
+        full_string = (pre_string + " " + str(self.conditions))
+        if full_string.endswith("['']"):
+            full_string = full_string[:-4]
+        elif full_string.endswith("[]"):
+            full_string = full_string[:-2]
+
+        return full_string
+
+condition_dictionary = {
+    "Push" : 0,
+    "Pull" : 0,
+    "Pierce" : 0,
+    "Target" : 0,
+    "Poison" : 0,
+    "Wound" : 0,
+    "Immobilize" : 0,
+    "Disarm" : 0,
+    "Stun" : 0,
+    "Muddle" : 0,
+    "Curse" : 0,
+    "Invisible" : 0,
+    "Strengthen" : 0,
+    "Bless" : 0
+}
+
+special_dictionary = {
+    "Miss" : 0,
+    "Critical" : 0,
+    "Curse" : 0,
+    "Bless" : 0,
+    "Advantaged Miss" : 0, # Rolling + Miss while advantage
+    "Disadvantaged Critical" : 0, # Rolling + Crit while disadvantage
+    "Super Critical" : [] # Rolling Crit Advantage, track each ones +value
+}
