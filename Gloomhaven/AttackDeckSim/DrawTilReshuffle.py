@@ -1,6 +1,6 @@
 from Card import *
 from Deck_Definition import *
-from random import shuffle
+import random
 import copy, statistics
 
 def setup_deck():
@@ -25,7 +25,7 @@ def setup_deck():
                 else:
                     deck.append(AttackCard(x, i, "Normal", False))
 
-    shuffle(deck)
+    random.shuffle(deck)
     return deck
 
 def draw_card(deck):
@@ -122,23 +122,43 @@ def get_effective_card(cards, advantage):
         else:
             return ComboCard(True, cards[1], 0, 0, 0)
 
-def play_until_shuffle(deck, attack_num_dist, advantage_dist):
+def determine_advantage(dist):
+    x = random.uniform(0, sum(dist))
+    
+    for i in range(len(dist)-1):
+        if x <= sum(dist[0:i+1]):
+            return i-1
+
+    return 1
+
+def determine_number_attacks(dist):
+    x = random.uniform(0, sum(dist))
+
+    for i in range(len(dist)-1):
+        if x <= sum(dist[0:i+1]):
+            return i+1
+
+    return len(dist)
+
+def play_until_shuffle(deck, player):
     reshuffle_triggered = False
     selected_results = []
     number_rounds = 0
     total_attacks = 0
     cards_to_reshuffle = []
+    advantage_tracker = []
 
     while((not reshuffle_triggered) and len(deck) > 0):
         number_rounds += 1
         # Pick number of attacks this round
-        num_attacks = 1
+        num_attacks = determine_number_attacks(player.num_attacks_dist)
         total_attacks += num_attacks
 
         for a in range(num_attacks):
             # Determine if this attack has (dis)advantage
             # 0 = Neither, 1 = Advantage, -1 = Disadvantage
-            advantage = 0
+            advantage = determine_advantage(player.advantage_dist)
+            advantage_tracker.append(advantage)
             
             drawn_cards = []
             # Draw the first card
@@ -148,6 +168,10 @@ def play_until_shuffle(deck, attack_num_dist, advantage_dist):
             if drawn_cards[-1].reshuffle(): reshuffle_triggered = True
             if not (drawn_cards[-1].type == "Curse" or drawn_cards[-1].type == "Bless"):
                 cards_to_reshuffle.append(drawn_cards[-1])
+            if len(deck) == 0:
+                deck += cards_to_reshuffle
+                random.shuffle(deck)
+                reshuffle_triggered = True
             
             # Draw until we do not draw a rolling modifier
             while(drawn_cards[-1].is_rolling):
@@ -156,6 +180,10 @@ def play_until_shuffle(deck, attack_num_dist, advantage_dist):
                 if drawn_cards[-1].reshuffle(): reshuffle_triggered = True
                 if not (drawn_cards[-1].type == "Curse" or drawn_cards[-1].type == "Bless"):
                     cards_to_reshuffle.append(drawn_cards[-1])
+                if len(deck) == 0:
+                    deck += cards_to_reshuffle
+                    random.shuffle(deck)
+                    reshuffle_triggered = True
                 
             # If we have (dis)advantage, we need at least 2 cards
             if ((len(drawn_cards)<2) and (advantage != 0)):
@@ -164,6 +192,10 @@ def play_until_shuffle(deck, attack_num_dist, advantage_dist):
                 if drawn_cards[-1].reshuffle(): reshuffle_triggered = True
                 if not (drawn_cards[-1].type == "Curse" or drawn_cards[-1].type == "Bless"):
                     cards_to_reshuffle.append(drawn_cards[-1])
+                if len(deck) == 0:
+                    deck += cards_to_reshuffle
+                    random.shuffle(deck)
+                    reshuffle_triggered = True
                 if(drawn_cards[-1].is_rolling):
                     # So the first card is normal, the second rolling.
                     # Reverse them for the picking function
@@ -172,9 +204,9 @@ def play_until_shuffle(deck, attack_num_dist, advantage_dist):
             selected_results.append(get_effective_card(drawn_cards, advantage))
 
     deck += cards_to_reshuffle
-    shuffle(deck)
+    random.shuffle(deck)
     #print('Shuffling Deck...')
-    return selected_results, number_rounds, total_attacks, deck
+    return selected_results, number_rounds, total_attacks, deck, advantage_tracker
 
 def process_attack_results(attack_results):
     n = len(attack_results)
@@ -202,56 +234,69 @@ def process_attack_results(attack_results):
     print(total_specials)
     return
 
-def play_num_rounds_without_reset(min_rounds, num_starting_curses, num_starting_blesses):
+def play_num_rounds_without_reset(player):
     attack_deck = setup_deck()
-    for i in range(num_starting_curses):
+    for i in range(player.starting_curses):
         attack_deck.append(AttackCard(0, "", "Curse", False))
-    for i in range(num_starting_blesses):
+    for i in range(player.starting_blesses):
         attack_deck.append(AttackCard(0, "", "Bless", False))
-    shuffle(attack_deck)
+    random.shuffle(attack_deck)
     
     played_rounds = 0
     attacks_taken = 0
     attack_results = []
     shuffles = 0
+    number_of_advantage = []
 
-    while(played_rounds <= min_rounds):
-        new_results, new_rounds, new_attacks, attack_deck = play_until_shuffle(attack_deck, 0, 0)
+    while(played_rounds <= player.round_per_game):
+        new_results, new_rounds, new_attacks, attack_deck, advantage_tracker = \
+            play_until_shuffle(attack_deck, player)
 
         played_rounds += new_rounds
         attacks_taken += new_attacks
         attack_results += new_results
         shuffles += 1
-
+        number_of_advantage += advantage_tracker
 
    # process_attack_results(attack_results)
-    return attack_results, played_rounds, attacks_taken, shuffles
+    return attack_results, played_rounds, attacks_taken, shuffles, number_of_advantage
 
-def play_num_games(num_games, rounds_per_game):
+def play_num_games(num_games, player):
     played_rounds = 0
     attacks_taken = 0
     attack_results = []
     shuffles = 0
 
     for i in range(num_games):
-        new_results, new_rounds, new_attacks, new_shuffles = play_num_rounds_without_reset(rounds_per_game, 0, 0)
+        new_results, new_rounds, new_attacks, new_shuffles, number_of_advantage = \
+            play_num_rounds_without_reset(player)
         played_rounds += new_rounds
         attacks_taken += new_attacks
         attack_results += new_results
         shuffles += new_shuffles
 
     process_attack_results(attack_results)
+
+    advantage_distribution = [number_of_advantage.count(-1)/len(number_of_advantage)]
+    advantage_distribution.append(number_of_advantage.count(0)/len(number_of_advantage))
+    advantage_distribution.append(number_of_advantage.count(1)/len(number_of_advantage)) 
+    
     print('Played ' + str(played_rounds) + ' rounds, and made ' + str(attacks_taken) + ' attacks')
     print('Shuffled ' + str(shuffles) + ' times.')
     print('Averaged ' + str(attacks_taken/shuffles) + ' attacks per shuffle!')
+    print('Advantage distribution was: ' + str(advantage_distribution))
     return
 
 
+test_player = Player(player_definition)
+play_num_games(10000, test_player)
 
-##attack_deck = setup_deck()
-##test_select, test_rounds, test_attacks = play_until_shuffle(attack_deck, 0, 0)
-##print('Attacked ' + str(test_attacks) + ' times in ' + str(test_rounds) + ' rounds')
-##for i in test_select:
-##    print(str(i))
-
-play_num_games(100, 14)
+##test_dist = [0, 0.25, 0.5]
+##results = []
+##for i in range(100000):
+##    results.append(determine_number_attacks(test_dist))
+##
+##n = len(results)
+##print('Percent of ' + '1' + ' attacks: ' + str(results.count(1)/n))
+##print('Percent of ' + '2' + ' attacks: ' + str(results.count(2)/n))
+##print('Percent of ' + '3' + ' attacks: ' + str(results.count(3)/n))

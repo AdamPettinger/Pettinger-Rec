@@ -104,3 +104,14 @@ special_dictionary = {
     "Disadvantaged Critical" : 0, # Rolling + Crit while disadvantage
     "Super Critical" : [] # Rolling Crit Advantage, track each ones +value
 }
+
+class Player:
+    def __init__(self, player_dict):
+        self.round_per_game = player_dict["Rounds per Game"]
+        self.advantage_dist = player_dict["Advantage Distribution"]
+        self.num_attacks_dist = player_dict["Number of Attacks Distribution"]
+        self.starting_curses = player_dict["Number of Starting Curses"]
+        self.starting_blesses = player_dict["Number of Starting Blesses"]
+        self.curse_chance = player_dict["Likelihood of getting Cursed"]
+        self.bless_chance = player_dict["Likelihood of getting Blessed"]
+        
