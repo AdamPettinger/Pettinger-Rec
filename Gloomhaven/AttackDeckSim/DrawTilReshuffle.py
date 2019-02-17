@@ -31,34 +31,25 @@ def setup_deck():
 def draw_card(deck):
     card = deck[0]
     deck.pop(0)
+    #print('Drew: ' + str(card))
     return card, deck;
 
 def get_effective_card(cards, advantage):
     # Cards is in order drawn. So every element before the last is rolling
     # Only the end card may be Miss, Crit, Curse, Bless
-
-    if(advantage == 0 or (advantage == 1 and cards[0].is_rolling)):
+    if(advantage == 0):
         # Neither disadvantage or advantage
-        # OR
-        # Advantage, but there are rolling modifiers
         # Just sum all the rolling modifiers with the last card
         card_type = cards[-1].type
         value = 0
         conditions = []
-        if len(cards) == 1:
-            return ComboCard(True, cards[0], 0, 0, 0)
         
         for i in cards:
             value += i.value
             if i.condition:
                 conditions.append(i.condition)
-        # Mark if we just Missed with advantage
-        if(cards[-1].type == "Miss" or cards[-1].type == "Curse"):
-            return ComboCard(False, 0, 0, "Advantaged Miss", "")
-        # Mark if we just Super Criticalled
-        elif(cards[-1].type == "Critical" or cards[-1].type == "Bless"):
-            return ComboCard(False, 0, value, "Super Critical", conditions)
         return ComboCard(False, 0, value, card_type, conditions)
+    
     elif(advantage == -1):
         # Disadvantage, disregard the rolling cards and take the non-rolling
         # If we have two non-rolling, take worst. First if tied
@@ -91,11 +82,27 @@ def get_effective_card(cards, advantage):
         else:
             return ComboCard(True, cards[1], 0, 0, 0)
     elif(advantage == 1):
+        value = 0
+        conditions = []
+        if cards[0].is_rolling:
+            # Advantage with rolling modifiers...
+            # Mark if we just Missed with advantage
+            if(cards[-1].type == "Miss" or cards[-1].type == "Curse"):
+                return ComboCard(False, 0, 0, "Advantaged Miss", "")
+            # Using the rolling cards to find the new value and conditions
+            for i in cards:
+                value += i.value
+                if i.condition:
+                    conditions.append(i.condition)
+            # Mark if we just Super Criticalled
+            if(cards[-1].type == "Critical" or cards[-1].type == "Bless"):
+                return ComboCard(False, 0, value, "Super Critical", conditions)
+            return ComboCard(False, 0, value, card_type, conditions)
+        
         # Advantage without rolling cards, take the best one
         # If either are Bless or Critical, we take it
         if ((cards[0].type == "Bless") or (cards[0].type == "Critical") or
             (cards[1].type == "Bless") or (cards[1].type == "Critical")):
-            # If either of them are Blesses or Criticals, we Crit
             return ComboCard(False, 0, 0, "Critical", "")
         # If one is curse/miss, take the other
         elif ((cards[0].type == "Miss") or (cards[0].type == "Curse")):
@@ -120,6 +127,7 @@ def play_until_shuffle(deck, attack_num_dist, advantage_dist):
     selected_results = []
     number_rounds = 0
     total_attacks = 0
+    cards_to_reshuffle = []
 
     while((not reshuffle_triggered) and len(deck) > 0):
         number_rounds += 1
@@ -138,18 +146,24 @@ def play_until_shuffle(deck, attack_num_dist, advantage_dist):
             drawn_cards.append(card)
             # Check to see if we just drew the Miss or Crit
             if drawn_cards[-1].reshuffle(): reshuffle_triggered = True
+            if not (drawn_cards[-1].type == "Curse" or drawn_cards[-1].type == "Bless"):
+                cards_to_reshuffle.append(drawn_cards[-1])
             
             # Draw until we do not draw a rolling modifier
             while(drawn_cards[-1].is_rolling):
                 card, deck = draw_card(deck)
                 drawn_cards.append(card)
                 if drawn_cards[-1].reshuffle(): reshuffle_triggered = True
+                if not (drawn_cards[-1].type == "Curse" or drawn_cards[-1].type == "Bless"):
+                    cards_to_reshuffle.append(drawn_cards[-1])
                 
             # If we have (dis)advantage, we need at least 2 cards
             if ((len(drawn_cards)<2) and (advantage != 0)):
                 card, deck = draw_card(deck)
                 drawn_cards.append(card)
                 if drawn_cards[-1].reshuffle(): reshuffle_triggered = True
+                if not (drawn_cards[-1].type == "Curse" or drawn_cards[-1].type == "Bless"):
+                    cards_to_reshuffle.append(drawn_cards[-1])
                 if(drawn_cards[-1].is_rolling):
                     # So the first card is normal, the second rolling.
                     # Reverse them for the picking function
@@ -157,7 +171,10 @@ def play_until_shuffle(deck, attack_num_dist, advantage_dist):
 
             selected_results.append(get_effective_card(drawn_cards, advantage))
 
-    return selected_results, number_rounds, total_attacks
+    deck += cards_to_reshuffle
+    shuffle(deck)
+    #print('Shuffling Deck...')
+    return selected_results, number_rounds, total_attacks, deck
 
 def process_attack_results(attack_results):
     n = len(attack_results)
@@ -185,28 +202,56 @@ def process_attack_results(attack_results):
     print(total_specials)
     return
 
-def play_num_rounds_without_reset(min_rounds):
+def play_num_rounds_without_reset(min_rounds, num_starting_curses, num_starting_blesses):
     attack_deck = setup_deck()
+    for i in range(num_starting_curses):
+        attack_deck.append(AttackCard(0, "", "Curse", False))
+    for i in range(num_starting_blesses):
+        attack_deck.append(AttackCard(0, "", "Bless", False))
+    shuffle(attack_deck)
     
     played_rounds = 0
     attacks_taken = 0
     attack_results = []
+    shuffles = 0
 
     while(played_rounds <= min_rounds):
-        new_results, new_rounds, new_attacks = play_until_shuffle(attack_deck, 0, 0)
+        new_results, new_rounds, new_attacks, attack_deck = play_until_shuffle(attack_deck, 0, 0)
 
         played_rounds += new_rounds
         attacks_taken += new_attacks
         attack_results += new_results
+        shuffles += 1
 
+
+   # process_attack_results(attack_results)
+    return attack_results, played_rounds, attacks_taken, shuffles
+
+def play_num_games(num_games, rounds_per_game):
+    played_rounds = 0
+    attacks_taken = 0
+    attack_results = []
+    shuffles = 0
+
+    for i in range(num_games):
+        new_results, new_rounds, new_attacks, new_shuffles = play_num_rounds_without_reset(rounds_per_game, 0, 0)
+        played_rounds += new_rounds
+        attacks_taken += new_attacks
+        attack_results += new_results
+        shuffles += new_shuffles
+
+    process_attack_results(attack_results)
+    print('Played ' + str(played_rounds) + ' rounds, and made ' + str(attacks_taken) + ' attacks')
+    print('Shuffled ' + str(shuffles) + ' times.')
+    print('Averaged ' + str(attacks_taken/shuffles) + ' attacks per shuffle!')
     return
 
 
 
-attack_deck = setup_deck()
-test_select, test_rounds, test_attacks = play_until_shuffle(attack_deck, 0, 0)
-print('Attacked ' + str(test_attacks) + ' times in ' + str(test_rounds) + ' rounds')
-for i in test_select:
-    print(str(i))
+##attack_deck = setup_deck()
+##test_select, test_rounds, test_attacks = play_until_shuffle(attack_deck, 0, 0)
+##print('Attacked ' + str(test_attacks) + ' times in ' + str(test_rounds) + ' rounds')
+##for i in test_select:
+##    print(str(i))
 
-process_attack_results(test_select)
+play_num_games(100, 14)
